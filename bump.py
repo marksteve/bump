@@ -54,7 +54,7 @@ def main():
                         content[m.end(1):])
                 print('Updated', args.file)
         else:
-            print('Canceled')
+            print('Cancelled')
 
     else:
         print("No version definition found")
