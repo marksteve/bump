@@ -22,11 +22,11 @@ def main():
     args = parser.parse_args()
 
     with open(args.file, 'rb') as f:
-        m = re.search('\s*version\s*=\s*(\'|")?([^\'",]+)(\'|")?',
+        m = re.search('\s*[\'"]?version[\'"]?\s*[=:]\s*[\'"]?([^\'",]+)[\'"]?',
                       f.read().decode('utf-8'), re.I)
 
     if m:
-        version_string = m.group(2)
+        version_string = m.group(1)
         try:
             version = list(map(int, version_string.split('.')))
         except ValueError:
@@ -52,8 +52,8 @@ def main():
                 content = bytes(m.string, 'utf-8') if IS_PY3 else m.string
                 if IS_PY3:
                     new_version_string = bytes(new_version_string, 'utf-8')
-                f.write(content[:m.start(2)] + new_version_string +
-                        content[m.end(2):])
+                f.write(content[:m.start(1)] + new_version_string +
+                        content[m.end(1):])
                 print('Updated', args.file)
         else:
             print('Canceled')
