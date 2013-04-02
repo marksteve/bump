@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='bump',
-    version='0.1.2',
+    version='0.1.3',
     description='Bumps package version numbers',
     long_description=open('README.rst').read(),
     license='MIT',
