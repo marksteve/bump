@@ -35,12 +35,10 @@ def main():
             version += [0]
         if args.major:
             version = version[0] + 1, 0, 0
-        elif args.minor and len(version) > 1:
+        elif args.minor:
             version = version[0], version[1] + 1, 0
-        elif len(version) > 2:
-            version = version[0], version[1], version[2] + 1
         else:
-            print("Invalid version string:", version_string)
+            version = version[0], version[1], version[2] + 1
 
         new_version_string = '.'.join(map(str, version))
         print(version_string, '=>', new_version_string)
