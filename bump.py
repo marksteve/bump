@@ -17,17 +17,17 @@ def get_args():
         prog='bump',
         description="Bumps package version numbers")
     parser.add_argument('files', help='Files to update', nargs='+')
-    parser.add_argument('-M', dest='major', action='store_true', default=False,
-                        help="Bump major version")
-    parser.add_argument('-m', dest='minor', action='store_true', default=False,
-                        help="Bump minor version")
-    parser.add_argument('-b', dest='build', action='store_true', default=True,
-                        help="Bump build version")
+    parser.add_argument('-M', dest='number', action='store_const',
+                        const='major', help="Bump major number")
+    parser.add_argument('-m', dest='number', action='store_const',
+                        const='minor', help="Bump minor number")
+    parser.add_argument('-b', dest='number', action='store_const',
+                        const='build', help="Bump build number")
 
     return parser.parse_args()
 
 
-def bump_version(version_string, major, minor, build):
+def bump_version(version_string, number):
     """
     Bumps a version number.
     Returns bumped version string or None if version string is invalid.
@@ -39,17 +39,17 @@ def bump_version(version_string, major, minor, build):
     else:
         while len(version) < 3:
             version += [0]
-        if major:
+        if number == 'major':
             version = version[0] + 1, 0, 0
-        elif minor:
+        elif number == 'minor':
             version = version[0], version[1] + 1, 0
-        elif build:
+        else:
             version = version[0], version[1], version[2] + 1
 
         return '.'.join(map(str, version))
 
 
-def get_matches(files, major, minor, build):
+def get_matches(files, number):
     """Returns dict of version definition matches"""
 
     matches = {}
@@ -62,8 +62,7 @@ def get_matches(files, major, minor, build):
 
         if match:
             version_string = match.group(1)
-            bumped_version_string = bump_version(version_string, major, minor,
-                                                 build)
+            bumped_version_string = bump_version(version_string, number)
 
             if not bumped_version_string:
                 print("Invalid version string in {}: {}"
