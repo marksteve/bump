@@ -10,7 +10,9 @@ import sys
 IS_PY3 = sys.version_info[0] == 3
 
 
-def main():
+def get_args():
+    """Parse and return args"""
+
     parser = argparse.ArgumentParser(
         prog='bump',
         description="Bumps package version numbers")
@@ -21,12 +23,38 @@ def main():
                         help="Bump minor version")
     parser.add_argument('-b', dest='build', action='store_true', default=True,
                         help="Bump build version")
-    args = parser.parse_args()
+
+    return parser.parse_args()
+
+
+def bump_version(version_string, major, minor, build):
+    """
+    Bumps a version number.
+    Returns bumped version string or None if version string is invalid.
+    """
+    try:
+        version = list(map(int, version_string.split('.')))
+    except ValueError:
+        pass
+    else:
+        while len(version) < 3:
+            version += [0]
+        if major:
+            version = version[0] + 1, 0, 0
+        elif minor:
+            version = version[0], version[1] + 1, 0
+        elif build:
+            version = version[0], version[1], version[2] + 1
+
+        return '.'.join(map(str, version))
+
+
+def get_matches(files, major, minor, build):
+    """Returns dict of version definition matches"""
 
     matches = {}
 
-    for filename in args.files:
-
+    for filename in files:
         with open(filename, 'rb') as f:
             match = re.search(
                 '\s*[\'"]?version[\'"]?\s*[=:]\s*[\'"]?([^\'",]+)[\'"]?',
@@ -34,53 +62,53 @@ def main():
 
         if match:
             version_string = match.group(1)
-            try:
-                version = list(map(int, version_string.split('.')))
-            except ValueError:
-                print("Invalid version string in", filename, ":",
-                      version_string)
-            else:
-                while len(version) < 3:
-                    version += [0]
-                if args.major:
-                    version = version[0] + 1, 0, 0
-                elif args.minor:
-                    version = version[0], version[1] + 1, 0
-                elif args.build:
-                    version = version[0], version[1], version[2] + 1
+            bumped_version_string = bump_version(version_string, major, minor,
+                                                 build)
 
-                new_version_string = '.'.join(map(str, version))
+            if not bumped_version_string:
+                print("Invalid version string in {}: {}"
+                      .format(filename, version_string))
+                continue
 
-                matches[filename] = dict(match=match,
-                                         version_string=version_string,
-                                         new_version_string=new_version_string)
+            matches[filename] = dict(
+                match=match,
+                version_string=version_string,
+                bumped_version_string=bumped_version_string)
 
         else:
             print("No version definition found in", filename)
 
+    return matches
+
+
+def main():
+    matches = get_matches(**get_args().__dict__)
+
     if len(matches) < 1:
         exit(1)
 
+    # Print bumps
     for filename, match in matches.items():
-        print(filename, ':', match['version_string'], '=>',
-              match['new_version_string'])
+        print("{}: {} => {}".format(filename, match['version_string'],
+                                    match['bumped_version_string']))
 
+    # Confirm update
     __input = input if IS_PY3 else raw_input
-
-    if __input('Is this ok? y/n ').lower() == 'y':
-        for filename, match in matches.items():
-            new_version_string = match['new_version_string']
-            with open(filename, 'wb') as f:
-                content = (bytes(match['match'].string, 'utf-8') if IS_PY3 else
-                           match['match'].string)
-                if IS_PY3:
-                    new_version_string = bytes(new_version_string, 'utf-8')
-                f.write(content[:match['match'].start(1)] +
-                        new_version_string + content[match['match'].end(1):])
-                print('Updated', filename)
-    else:
-        print('Cancelled')
+    if __input("Is this ok? y/n ").lower() != 'y':
+        print("Cancelled")
         exit(1)
+
+    # Update files
+    for filename, match in matches.items():
+        with open(filename, 'wb') as f:
+            bumped_version_string = match['bumped_version_string']
+            content = (bytes(match['match'].string, 'utf-8') if IS_PY3 else
+                       match['match'].string)
+            if IS_PY3:
+                bumped_version_string = bytes(bumped_version_string, 'utf-8')
+            f.write(content[:match['match'].start(1)] +
+                    bumped_version_string + content[match['match'].end(1):])
+            print("Updated", filename)
 
 
 if __name__ == '__main__':
