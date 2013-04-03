@@ -58,6 +58,10 @@ def main():
         else:
             print("No version definition found in", filename)
 
+    if len(matches) < 1:
+        print("No files to update")
+        exit(1)
+
     for filename, match in matches.items():
         print(filename, ':', match['version_string'], '=>',
               match['new_version_string'])
@@ -77,6 +81,7 @@ def main():
                 print('Updated', filename)
     else:
         print('Cancelled')
+        exit(1)
 
 
 if __name__ == '__main__':
