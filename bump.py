@@ -59,7 +59,6 @@ def main():
             print("No version definition found in", filename)
 
     if len(matches) < 1:
-        print("No files to update")
         exit(1)
 
     for filename, match in matches.items():
