@@ -23,15 +23,20 @@ def get_args():
                         const='minor', help="Bump minor number")
     parser.add_argument('-b', dest='number', action='store_const',
                         const='build', help="Bump build number")
+    parser.add_argument('-s', dest='suffix', type=str,
+                        help="Update suffix")
 
     return parser.parse_args()
 
 
-def bump_version(version_string, number):
+def bump_version(version_string, number, suffix):
     """
     Bumps a version number.
     Returns bumped version string or None if version string is invalid.
     """
+    match = re.search('([0-9\.]+)([^0-9\.]*)', version_string)
+    version_string = match.group(1)
+    curr_suffix = match.group(2)
     try:
         version = list(map(int, version_string.split('.')))
     except ValueError:
@@ -43,13 +48,14 @@ def bump_version(version_string, number):
             version = version[0] + 1, 0, 0
         elif number == 'minor':
             version = version[0], version[1] + 1, 0
-        else:
+        elif number == 'build' or suffix is None:
             version = version[0], version[1], version[2] + 1
+        if suffix is None:
+            suffix = curr_suffix
+        return '.'.join(map(str, version)) + suffix
 
-        return '.'.join(map(str, version))
 
-
-def get_matches(files, number):
+def get_matches(files, number, suffix=None):
     """Returns dict of version definition matches"""
 
     matches = {}
@@ -62,7 +68,8 @@ def get_matches(files, number):
 
         if match:
             version_string = match.group(1)
-            bumped_version_string = bump_version(version_string, number)
+            bumped_version_string = bump_version(version_string, number,
+                                                 suffix)
 
             if not bumped_version_string:
                 print("Invalid version string in {}: {}"
