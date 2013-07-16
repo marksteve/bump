@@ -25,6 +25,9 @@ def get_args():
                         const='patch', help="Bump patch version")
     parser.add_argument('-s', dest='suffix', type=str,
                         help="Update suffix")
+    parser.add_argument('-q', dest='quiet', action='store_true',
+                        help="Quiet mode: bumps without confirmation and only"
+                             "the bumped version number is printed")
 
     return parser.parse_args()
 
@@ -88,21 +91,25 @@ def get_matches(files, version, suffix=None):
 
 
 def main():
-    matches = get_matches(**get_args().__dict__)
+    args = get_args().__dict__
+    quiet = args.pop('quiet')
+    matches = get_matches(**args)
 
     if len(matches) < 1:
         exit(1)
 
-    # Print bumps
-    for filename, match in matches.items():
-        print("{}: {} => {}".format(filename, match['version_string'],
-                                    match['bumped_version_string']))
+    if not quiet:
 
-    # Confirm update
-    __input = input if IS_PY3 else raw_input
-    if __input("Is this ok? y/n ").lower() != 'y':
-        print("Cancelled")
-        exit(1)
+        # Print bumps
+        for filename, match in matches.items():
+            print("{}: {} => {}".format(filename, match['version_string'],
+                                        match['bumped_version_string']))
+
+        # Confirm update
+        __input = input if IS_PY3 else raw_input
+        if __input("Is this ok? y/n ").lower() != 'y':
+            print("Cancelled")
+            exit(1)
 
     # Update files
     for filename, match in matches.items():
@@ -114,7 +121,11 @@ def main():
                 bumped_version_string = bytes(bumped_version_string, 'utf-8')
             f.write(content[:match['match'].start(1)] +
                     bumped_version_string + content[match['match'].end(1):])
-            print("Updated", filename)
+
+            if quiet:
+                print(bumped_version_string)
+            else:
+                print("Updated", filename)
 
 
 if __name__ == '__main__':
