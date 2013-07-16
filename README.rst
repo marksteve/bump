@@ -31,6 +31,8 @@ Add suffix ::
     
     $ bump setup.py -M -s=-rc
     2.0.0 => 3.0.0-rc
+    Is this ok? y/n y
+    Updated setup.py
 
 Quiet mode ::
 
