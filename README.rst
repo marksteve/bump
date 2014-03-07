@@ -1,6 +1,8 @@
 bump
 ====
 
+.. image:: http://img.shields.io/pypi/v/bump.png
+
 Bumps package versions
 
 Usage:
