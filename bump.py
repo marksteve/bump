@@ -1,132 +1,98 @@
-#!/usr/bin/env python
-
-from __future__ import print_function
-
-import argparse
+import click
 import re
-import sys
+
+VALID_TEXT = re.compile('^[0-9A-Za-z\-\.]$')
 
 
-IS_PY3 = sys.version_info[0] == 3
+class SemVer(object):
 
+  __slots__ = [
+    'major',
+    'minor',
+    'patch',
+    'pre',
+    'build',
+  ]
 
-def get_args():
-    """Parse and return args"""
+  def __init__(self, **kwargs):
+    for n in self.__slots__:
+      setattr(self, n, kwargs.get(n))
 
-    parser = argparse.ArgumentParser(
-        prog='bump',
-        description="Bumps package versions")
-    parser.add_argument('files', help='Files to update', nargs='+')
-    parser.add_argument('-M', dest='version', action='store_const',
-                        const='major', help="Bump major version")
-    parser.add_argument('-m', dest='version', action='store_const',
-                        const='minor', help="Bump minor version")
-    parser.add_argument('-b', dest='version', action='store_const',
-                        const='patch', help="Bump patch version")
-    parser.add_argument('-s', dest='suffix', type=str,
-                        help="Update suffix")
-    parser.add_argument('-q', dest='quiet', action='store_true',
-                        help="Quiet mode: bumps without confirmation and only"
-                             "the bumped version number is printed")
+  def __repr__(self):
+    return "<SemVer {}>".format(
+      ", ".join([
+        "{}={}".format(n, getattr(self, n))
+        for n in self.__slots__
+      ]))
 
-    return parser.parse_args()
+  def __str__(self):
+    version_string = ".".join(map(str,
+      [self.major, self.minor, self.patch]))
+    if self.pre:
+      version_string += "-" + self.pre
+    if self.build:
+      version_string += "+" + self.build
+    return version_string
 
-
-def bump_version(version_string, version, suffix):
-    """
-    Bumps a version.
-    Returns bumped version string or None if version string is invalid.
-    """
-    match = re.search('([0-9\.]+)([^0-9\.]*)', version_string)
-    version_string = match.group(1)
-    curr_suffix = match.group(2)
-    try:
-        versions = list(map(int, version_string.split('.')))
-    except ValueError:
-        pass
+  @classmethod
+  def parse(cls, version):
+    major = minor = patch = 0
+    build = pre = None
+    build_split = version.split('+')
+    if len(build_split) > 1:
+      version, build = build_split
+    pre_split = version.split('-', 1)
+    if len(pre_split) > 1:
+      version, pre = pre_split
+    major_split = version.split('.', 1)
+    if len(major_split) > 1:
+      major, version = major_split
+      minor_split = version.split(b'.', 1)
+      if len(minor_split) > 1:
+        minor, version = minor_split
+        if version:
+          patch = version
+      else:
+        minor = version
     else:
-        while len(versions) < 3:
-            versions += [0]
-        if version == 'major':
-            versions = versions[0] + 1, 0, 0
-        elif version == 'minor':
-            versions = versions[0], versions[1] + 1, 0
-        elif version == 'patch' or suffix is None:
-            versions = versions[0], versions[1], versions[2] + 1
-        if suffix is None:
-            suffix = curr_suffix
-        return '.'.join(map(str, versions)) + suffix
+      major = version
+    return cls(
+      major=int(major),
+      minor=int(minor),
+      patch=int(patch),
+      pre=pre,
+      build=build,
+    )
+
+  def bump(self, **kwargs):
+    number = kwargs.get('number')
+    if number == 'major':
+      self.major += 1
+    elif number == 'minor':
+      self.minor += 1
+    elif number == 'patch':
+      self.patch += 1
+    self.pre = kwargs.get('pre')
+    self.build = kwargs.get('build')
 
 
-def get_matches(files, version, suffix=None):
-    """Returns dict of version definition matches"""
-
-    matches = {}
-
-    for filename in files:
-        with open(filename, 'rb') as f:
-            match = re.search(
-                '\s*[\'"]?version[\'"]?\s*[=:]\s*[\'"]?([^\'",]+)[\'"]?',
-                f.read().decode('utf-8'), re.I)
-
-        if match:
-            version_string = match.group(1)
-            bumped_version_string = bump_version(version_string, version,
-                                                 suffix)
-
-            if not bumped_version_string:
-                print("Invalid version string in {}: {}"
-                      .format(filename, version_string))
-                continue
-
-            matches[filename] = dict(
-                match=match,
-                version_string=version_string,
-                bumped_version_string=bumped_version_string)
-
-        else:
-            print("No version definition found in", filename)
-
-    return matches
-
-
-def main():
-    args = get_args().__dict__
-    quiet = args.pop('quiet')
-    matches = get_matches(**args)
-
-    if len(matches) < 1:
-        exit(1)
-
-    if not quiet:
-
-        # Print bumps
-        for filename, match in matches.items():
-            print("{}: {} => {}".format(filename, match['version_string'],
-                                        match['bumped_version_string']))
-
-        # Confirm update
-        __input = input if IS_PY3 else raw_input
-        if __input("Is this ok? y/n ").lower() != 'y':
-            print("Cancelled")
-            exit(1)
-
-    # Update files
-    for filename, match in matches.items():
-        with open(filename, 'wb') as f:
-            bumped_version_string = match['bumped_version_string']
-            content = (bytes(match['match'].string, 'utf-8') if IS_PY3 else
-                       match['match'].string)
-            if IS_PY3:
-                bumped_version_string = bytes(bumped_version_string, 'utf-8')
-            f.write(content[:match['match'].start(1)] +
-                    bumped_version_string + content[match['match'].end(1):])
-
-            if quiet:
-                print(bumped_version_string)
-            else:
-                print("Updated", filename)
+@click.command()
+@click.option('--major', '-M', 'number', flag_value='major',
+              help="Bump major number")
+@click.option('--minor', '-m', 'number', flag_value='minor',
+              help="Bump minor number")
+@click.option('--patch', '-p', 'number', flag_value='patch',
+              help="Bump patch number")
+@click.option('--pre', help="Set pre-release identifier")
+@click.option('--build', help="Set build metadata")
+@click.argument('input', type=click.File('rb'))
+@click.argument('output', type=click.File('wb'))
+def main(**kwargs):
+  version_string = kwargs['input'].read()
+  version = SemVer.parse(version_string)
+  version.bump(**kwargs)
+  click.echo(version)
 
 
 if __name__ == '__main__':
-    main()
+  main()
